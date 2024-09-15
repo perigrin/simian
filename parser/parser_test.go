@@ -1,20 +1,21 @@
-package parser
+package parser_test
 
 import (
 	"testing"
 
 	"github.com/perigrin/simian/ast"
 	"github.com/perigrin/simian/lexer"
+	"github.com/perigrin/simian/parser"
 )
 
 func TestLetStatments(t *testing.T) {
 	input := `
-	let x = 5;
-	let y = 10;
-	let foobar = 838383;
+	my $x = 5;
+	my $y = 10;
+	my $foobar = 838383;
 	`
 	l := lexer.New(input)
-	p := New(l)
+	p := parser.New(l)
 
 	program := p.ParseProgram()
 	checkParseErrors(t, p)
@@ -29,22 +30,22 @@ func TestLetStatments(t *testing.T) {
 	tests := []struct {
 		Identifier string
 	}{
-		{"x"},
-		{"y"},
-		{"foobar"},
+		{"$x"},
+		{"$y"},
+		{"$foobar"},
 	}
 
 	for i, tt := range tests {
 		stmt := program.Statements[i]
-		if !testLetStatement(t, stmt, tt.Identifier) {
+		if !testMyStatement(t, stmt, tt.Identifier) {
 			return
 		}
 	}
 }
 
-func testLetStatement(t *testing.T, s ast.Statement, name string) bool {
-	if s.TokenLiteral() != "let" {
-		t.Errorf("s.TokenLiteral not 'let': got %s", s.TokenLiteral())
+func testMyStatement(t *testing.T, s ast.Statement, name string) bool {
+	if s.TokenLiteral() != "my" {
+		t.Errorf("s.TokenLiteral not 'my': got %s", s.TokenLiteral())
 		return false
 	}
 	letStmt, ok := s.(*ast.LetStatement)
@@ -63,7 +64,7 @@ func testLetStatement(t *testing.T, s ast.Statement, name string) bool {
 	return true
 }
 
-func checkParseErrors(t *testing.T, p *Parser) {
+func checkParseErrors(t *testing.T, p *parser.Parser) {
 	errors := p.Errors()
 	if len(errors) == 0 {
 		return
