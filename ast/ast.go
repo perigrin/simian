@@ -28,14 +28,14 @@ func (p *Program) TokenLiteral() string {
 	}
 }
 
-type LetStatement struct {
+type MyStatement struct {
 	Token token.Token // "LET"
 	Name  *Identifier
 	Value Expression
 }
 
-func (ls *LetStatement) statementNode()       {}
-func (ls *LetStatement) TokenLiteral() string { return ls.Token.Literal }
+func (ls *MyStatement) statementNode()       {}
+func (ls *MyStatement) TokenLiteral() string { return ls.Token.Literal }
 
 type Identifier struct {
 	Token token.Token // "IDENT"
@@ -44,3 +44,37 @@ type Identifier struct {
 
 func (i *Identifier) expressionNode()      {}
 func (i *Identifier) TokenLiteral() string { return i.Token.Literal }
+
+type IntegerLiteral struct {
+	Token token.Token
+	Value string
+}
+
+func (i *IntegerLiteral) expressionNode()      {}
+func (i *IntegerLiteral) TokenLiteral() string { return i.Token.Literal }
+
+type TokenNode struct {
+	Token token.Token
+}
+
+func (t *TokenNode) expressionNode()      {}
+func (t *TokenNode) TokenLiteral() string { return t.Token.Literal }
+
+func TokenToAstNode(t token.Token) Node {
+	switch t.Type {
+	case token.IDENTIFIER:
+		return &Identifier{
+			Token: t,
+			Value: t.Literal,
+		}
+	case token.DIGIT:
+		// Assuming you have an IntegerLiteral type
+		return &IntegerLiteral{
+			Token: t,
+			Value: t.Literal,
+		}
+	default:
+		// For other token types, create a generic node or handle as needed
+		return &TokenNode{Token: t}
+	}
+}

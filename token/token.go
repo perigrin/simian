@@ -1,8 +1,6 @@
 package token
 
 import (
-	"log"
-	"strconv"
 	"unicode"
 )
 
@@ -120,7 +118,6 @@ var keywords = map[string]TokenType{
 }
 
 func LookupIdent(ident string) TokenType {
-	log.Printf("LookupIdent: %s", ident)
 	if t, ok := keywords[ident]; ok {
 		return t
 	}
@@ -129,7 +126,6 @@ func LookupIdent(ident string) TokenType {
 
 // getCharType determines the type of token based on the character provided.
 func GetCharType(ch rune, next rune) TokenType {
-	log.Printf("GetCharType: %s %s", string(ch), string(next))
 	switch {
 
 	// Symbols and Operators
@@ -227,6 +223,5 @@ func GetCharType(ch rune, next rune) TokenType {
 	}
 
 	// Illegal character
-	log.Printf("illegal character %q", strconv.QuoteRune(ch))
 	return ILLEGAL
 }

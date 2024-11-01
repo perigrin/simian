@@ -8,15 +8,20 @@ import (
 	"github.com/perigrin/simian/token"
 )
 
-type Parser struct {
+type Parser interface {
+	Errors() []string
+	ParseProgram() *ast.Program
+}
+
+type parser struct {
 	l         *lexer.Lexer
 	curToken  token.Token
 	peekToken token.Token
 	errors    []string
 }
 
-func New(l *lexer.Lexer) *Parser {
-	p := &Parser{
+func New(l *lexer.Lexer) Parser {
+	p := &parser{
 		l:      l,
 		errors: []string{},
 	}
@@ -27,21 +32,21 @@ func New(l *lexer.Lexer) *Parser {
 	return p
 }
 
-func (p *Parser) Errors() []string {
+func (p *parser) Errors() []string {
 	return p.errors
 }
 
-func (p *Parser) peekError(t token.TokenType) {
+func (p *parser) peekError(t token.TokenType) {
 	msg := fmt.Sprintf("expected next token %s got %s", t, p.peekToken.Type)
 	p.errors = append(p.errors, msg)
 }
 
-func (p *Parser) nextToken() {
+func (p *parser) nextToken() {
 	p.curToken = p.peekToken
 	p.peekToken = p.l.NextToken()
 }
 
-func (p *Parser) ParseProgram() *ast.Program {
+func (p *parser) ParseProgram() *ast.Program {
 	program := &ast.Program{}
 	program.Statements = []ast.Statement{}
 
@@ -55,19 +60,19 @@ func (p *Parser) ParseProgram() *ast.Program {
 	return program
 }
 
-func (p *Parser) parseStatement() ast.Statement {
+func (p *parser) parseStatement() ast.Statement {
 	switch p.curToken.Type {
 	case token.MY:
-		return p.parseLetStatement()
+		return p.parseMyStatement()
 	default:
 		return nil
 	}
 }
 
-func (p *Parser) parseLetStatement() *ast.LetStatement {
-	stmt := &ast.LetStatement{Token: p.curToken}
+func (p *parser) parseMyStatement() *ast.MyStatement {
+	stmt := &ast.MyStatement{Token: p.curToken}
 
-	if !p.expectPeek(token.IDENT) {
+	if !p.expectPeek(token.IDENTIFIER) {
 		return nil
 	}
 
@@ -76,22 +81,22 @@ func (p *Parser) parseLetStatement() *ast.LetStatement {
 	if !p.expectPeek(token.ASSIGN) {
 		return nil
 	}
-	//TODO: skip the expression until we get a semicolon
+	// TODO: skip the expression until we get a semicolon
 	for !p.curTokenIs(token.SEMICOLON) {
 		p.nextToken()
 	}
 	return stmt
 }
 
-func (p *Parser) curTokenIs(t token.TokenType) bool {
+func (p *parser) curTokenIs(t token.TokenType) bool {
 	return p.curToken.Type == t
 }
 
-func (p *Parser) peekTokenIs(t token.TokenType) bool {
+func (p *parser) peekTokenIs(t token.TokenType) bool {
 	return p.peekToken.Type == t
 }
 
-func (p *Parser) expectPeek(t token.TokenType) bool {
+func (p *parser) expectPeek(t token.TokenType) bool {
 	if p.peekTokenIs(t) {
 		p.nextToken()
 		return true

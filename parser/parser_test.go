@@ -48,23 +48,23 @@ func testMyStatement(t *testing.T, s ast.Statement, name string) bool {
 		t.Errorf("s.TokenLiteral not 'my': got %s", s.TokenLiteral())
 		return false
 	}
-	letStmt, ok := s.(*ast.LetStatement)
+	myStmt, ok := s.(*ast.MyStatement)
 	if !ok {
-		t.Errorf("s not *ast.LetStatement: got %T", s)
+		t.Errorf("s not *ast.MyStatement: got %T", s)
 		return false
 	}
-	if letStmt.Name.Value != name {
-		t.Errorf("letStmt.Name.Value != '%s': got %s", name, letStmt.Name.Value)
+	if myStmt.Name.Value != name {
+		t.Errorf("myStmt.Name.Value != '%s': got %s", name, myStmt.Name.Value)
 		return false
 	}
-	if letStmt.Name.TokenLiteral() != name {
-		t.Errorf("letStmt.Name.TokenLiteral() != '%s': got %s", name, letStmt.Name.TokenLiteral())
+	if myStmt.Name.TokenLiteral() != name {
+		t.Errorf("myStmt.Name.TokenLiteral() != '%s': got %s", name, myStmt.Name.TokenLiteral())
 		return false
 	}
 	return true
 }
 
-func checkParseErrors(t *testing.T, p *parser.Parser) {
+func checkParseErrors(t *testing.T, p parser.Parser) {
 	errors := p.Errors()
 	if len(errors) == 0 {
 		return
