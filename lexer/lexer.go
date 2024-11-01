@@ -1,6 +1,9 @@
 package lexer
 
 import (
+	"iter"
+	"unicode"
+
 	"github.com/perigrin/simian/token"
 )
 
@@ -31,6 +34,14 @@ func (l *Lexer) readChar() {
 	l.readPosition += 1
 }
 
+func (l *Lexer) Tokens() iter.Seq[token.Token] {
+	return func(yield func(token.Token) bool) {
+		for t := l.NextToken(); t.Type != token.EOF; t = l.NextToken() {
+			yield(t)
+		}
+	}
+}
+
 func (l *Lexer) NextToken() token.Token {
 	var t token.Token
 
@@ -43,7 +54,7 @@ func (l *Lexer) NextToken() token.Token {
 			ch := l.ch
 			l.readChar()
 			literal := string(ch) + string(l.ch)
-			t = token.Token{Type: token.EQ, Literal: literal}
+			t = token.Token{Type: token.EQUAL, Literal: literal}
 		} else {
 			t = newToken(token.ASSIGN, l.ch)
 		}
@@ -56,9 +67,9 @@ func (l *Lexer) NextToken() token.Token {
 			ch := l.ch
 			l.readChar()
 			literal := string(ch) + string(l.ch)
-			t = token.Token{Type: token.NOT_EQ, Literal: literal}
+			t = token.Token{Type: token.NOT_EQUAL, Literal: literal}
 		} else {
-			t = newToken(token.BANG, l.ch)
+			t = newToken(token.NOT, l.ch)
 		}
 	case '*':
 		t = newToken(token.ASTERISK, l.ch)
@@ -92,7 +103,7 @@ func (l *Lexer) NextToken() token.Token {
 			t.Type = token.LookupIdent(t.Literal)
 			return t
 		} else if isDigit(l.ch) {
-			t.Type = token.INT
+			t.Type = token.DIGIT
 			t.Literal = l.readNumber()
 			return t
 		} else {
@@ -126,15 +137,19 @@ func (l *Lexer) readNumber() string {
 }
 
 func isWhitespace(ch byte) bool {
-	return ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r'
+	return unicode.IsSpace(rune(ch))
+}
+
+func isSigil(ch byte) bool {
+	return ch == '$' || ch == '@' || ch == '%'
 }
 
 func isLetter(ch byte) bool {
-	return 'a' <= ch && ch <= 'z' || 'A' <= ch && ch <= 'Z' || ch == '_' || ch == '$'
+	return unicode.IsLetter(rune(ch)) || isSigil(ch) || ch == '_' || ch == ':'
 }
 
 func isDigit(ch byte) bool {
-	return '0' <= ch && ch <= '9'
+	return unicode.IsDigit(rune(ch))
 }
 
 func newToken(t token.TokenType, ch byte) token.Token {
