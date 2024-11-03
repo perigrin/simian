@@ -1,23 +1,65 @@
 package lexer
 
 import (
-	"iter"
-	"unicode"
-
 	"github.com/perigrin/simian/token"
 )
 
-type Lexer struct {
-	input        string
-	position     int  // current position in input (points to current char)
-	readPosition int  // current read position (after current char)
-	ch           byte // TODO replace this with runes
+type (
+	lexerFunction func(l *Lexer) token.Token
+	state         struct {
+		name string
+		run  lexerFunction
+	}
+)
+
+func (s state) String() string {
+	return s.name
 }
 
-func New(input string) *Lexer {
+var stateTable = map[token.TokenType]state{
+	token.SIGIL:      {name: "readIdentifier", run: (*Lexer).readIdentifier},
+	token.LETTER:     {name: "readIdentifier", run: (*Lexer).readIdentifier},
+	token.DIGIT:      {name: "readNumber", run: (*Lexer).readNumber},
+	token.WHITESPACE: {name: "readWhitespace", run: (*Lexer).readWhitespace},
+	token.OPERATOR:   {name: "readOperator", run: (*Lexer).readOperator},
+	token.COLON:      {name: "readIdentifier", run: (*Lexer).readIdentifier},
+}
+
+func readerForToken(t token.TokenType) state {
+	if t, ok := stateTable[t]; ok {
+		return t
+	}
+	s := state{name: "readSingleToken", run: (*Lexer).readSingleToken}
+	return s
+}
+
+type Lexer struct {
+	input        []byte
+	position     int
+	readPosition int
+	ch           byte
+}
+
+func New(input []byte) *Lexer {
 	l := &Lexer{input: input}
 	l.readChar()
 	return l
+}
+
+func (l *Lexer) NextToken() token.Token {
+	if l.isAtEnd() {
+		return token.Token{Type: token.EOF}
+	}
+
+	nextToken := token.LookupSingleToken(l.ch)
+	reader := readerForToken(nextToken)
+	tok := reader.run(l)
+
+	// skip whitespace
+	if tok.Type == token.WHITESPACE {
+		return l.NextToken()
+	}
+	return tok
 }
 
 func (l *Lexer) peekChar() byte {
@@ -34,124 +76,92 @@ func (l *Lexer) readChar() {
 	l.readPosition += 1
 }
 
-func (l *Lexer) Tokens() iter.Seq[token.Token] {
-	return func(yield func(token.Token) bool) {
-		for t := l.NextToken(); t.Type != token.EOF; t = l.NextToken() {
-			yield(t)
-		}
-	}
+func (l *Lexer) isAtEnd() bool {
+	return l.readPosition >= len(l.input)
 }
 
-func (l *Lexer) NextToken() token.Token {
-	var t token.Token
+func (l *Lexer) readSequence(check func(byte) bool) []byte {
+	position := l.position
+	for check(l.ch) {
+		l.readChar()
+	}
+	return l.input[position:l.position]
+}
 
-	l.skipWhitespace()
-
-	switch l.ch {
-	// OPERATORS
-	case '=':
-		if l.peekChar() == '=' {
-			ch := l.ch
-			l.readChar()
-			literal := string(ch) + string(l.ch)
-			t = token.Token{Type: token.EQUAL, Literal: literal}
-		} else {
-			t = newToken(token.ASSIGN, l.ch)
-		}
-	case '+':
-		t = newToken(token.PLUS, l.ch)
-	case '-':
-		t = newToken(token.MINUS, l.ch)
-	case '!':
-		if l.peekChar() == '=' {
-			ch := l.ch
-			l.readChar()
-			literal := string(ch) + string(l.ch)
-			t = token.Token{Type: token.NOT_EQUAL, Literal: literal}
-		} else {
-			t = newToken(token.NOT, l.ch)
-		}
-	case '*':
-		t = newToken(token.ASTERISK, l.ch)
-	case '/':
-		t = newToken(token.SLASH, l.ch)
-	case '<':
-		t = newToken(token.LT, l.ch)
-	case '>':
-		t = newToken(token.GT, l.ch)
-	// DELIMITERS
-	case ';':
-		t = newToken(token.SEMICOLON, l.ch)
-	case ',':
-		t = newToken(token.COMMA, l.ch)
-	// GROUPING
-	case '(':
-		t = newToken(token.LPAREN, l.ch)
-	case ')':
-		t = newToken(token.RPAREN, l.ch)
-	case '{':
-		t = newToken(token.LBRACE, l.ch)
-	case '}':
-		t = newToken(token.RBRACE, l.ch)
-	// EOF
-	case 0:
-		t.Literal = ""
-		t.Type = token.EOF
-	default:
-		if isLetter(l.ch) {
-			t.Literal = l.readIdentifier()
-			t.Type = token.LookupIdent(t.Literal)
-			return t
-		} else if isDigit(l.ch) {
-			t.Type = token.DIGIT
-			t.Literal = l.readNumber()
-			return t
-		} else {
-			t = newToken(token.ILLEGAL, l.ch)
+func (l *Lexer) readIdentifier() token.Token {
+	matcher := func(ch byte) bool {
+		switch {
+		case token.IsLetter(ch):
+			return true
+		case token.IsSigil(ch):
+			return true
+		case token.IsDigit(ch):
+			return true
+		case ch == '_':
+			return true
+		case ch == ':': // start of an attribute
+			return true
+		default:
+			return false
 		}
 	}
+
+	tok := token.Token{}
+	tok.Literal = l.readSequence(matcher)
+	tok.Type = token.LookupIdent(tok.Literal)
+	return tok
+}
+
+func (l *Lexer) readNumber() token.Token {
+	matcher := func(ch byte) bool {
+		return token.IsDigit(ch)
+	}
+
+	tok := token.Token{}
+	tok.Literal = l.readSequence(matcher)
+	tok.Type = token.DIGIT
+	return tok
+}
+
+func (l *Lexer) readOperator() token.Token {
+	buf := make([]byte, 0)
+	matcher := func(ch byte) bool {
+		buf = append(buf, ch)
+		return token.IsOperator(buf)
+	}
+
+	tok := token.Token{}
+	tok.Literal = l.readSequence(matcher)
+	tok.Type = token.LookupOperator(tok.Literal)
+	return tok
+}
+
+func (l *Lexer) readSingleToken() token.Token {
+	tok := token.Token{}
+	// we only need the one character
+	tok.Literal = []byte{l.ch}
+	tok.Type = token.LookupSingleToken(l.ch)
 	l.readChar()
-	return t
+	return tok
 }
 
-func (l *Lexer) skipWhitespace() {
-	for isWhitespace(l.ch) {
-		l.readChar()
+func (l *Lexer) readWhitespace() token.Token {
+	tok := token.Token{}
+	tok.Literal = l.readSequence(func(ch byte) bool {
+		return token.IsWhitespace(ch)
+	})
+	tok.Type = token.WHITESPACE
+	return tok
+}
+
+func (l *Lexer) Tokens() []token.Token {
+	tokens := []token.Token{}
+	for {
+		tok := l.NextToken()
+		if tok.Type == token.EOF {
+			break
+		}
+		tokens = append(tokens, tok)
 	}
-}
-
-func (l *Lexer) readIdentifier() string {
-	position := l.position
-	for isLetter(l.ch) {
-		l.readChar()
-	}
-	return l.input[position:l.position]
-}
-
-func (l *Lexer) readNumber() string {
-	position := l.position
-	for isDigit(l.ch) {
-		l.readChar()
-	}
-	return l.input[position:l.position]
-}
-
-func isWhitespace(ch byte) bool {
-	return unicode.IsSpace(rune(ch))
-}
-
-func isSigil(ch byte) bool {
-	return ch == '$' || ch == '@' || ch == '%'
-}
-
-func isLetter(ch byte) bool {
-	return unicode.IsLetter(rune(ch)) || isSigil(ch) || ch == '_' || ch == ':'
-}
-
-func isDigit(ch byte) bool {
-	return unicode.IsDigit(rune(ch))
-}
-
-func newToken(t token.TokenType, ch byte) token.Token {
-	return token.Token{Type: t, Literal: string(ch)}
+	return tokens
 }

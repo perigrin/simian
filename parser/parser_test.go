@@ -14,7 +14,7 @@ func TestLetStatments(t *testing.T) {
 	my $y = 10;
 	my $foobar = 838383;
 	`
-	l := lexer.New(input)
+	l := lexer.New([]byte(input))
 	p := parser.New(l)
 
 	program := p.ParseProgram()

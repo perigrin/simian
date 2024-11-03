@@ -135,8 +135,7 @@ func TestNextToken(t *testing.T) {
 		{token.ASSIGN, "="},
 		{token.STATE, "state"},
 		{token.IDENTIFIER, "$i"},
-		{token.PLUS, "+"},
-		{token.PLUS, "+"},
+		{token.PLUS, "++"},
 		{token.SEMICOLON, ";"},
 
 		{token.METHOD, "method"},
@@ -154,17 +153,17 @@ func TestNextToken(t *testing.T) {
 		{token.EOF, ""},
 	}
 
-	l := lexer.New(input)
+	l := lexer.New([]byte(input))
 
 	for i, tt := range tests {
 		tok := l.NextToken()
 
 		if tok.Type != tt.Type {
-			t.Fatalf("tests[%d] - token.type wrong, expected %q, got %q", i, tt.Type, tok.Type)
+			t.Fatalf("tests[%d] (%v) - token.type wrong, expected %+v, got %+v", i, tt.Literal, tt.Type, tok.Type)
 		}
 
-		if tok.Literal != tt.Literal {
-			t.Fatalf("tests[%d] - token.literal wrong, expected %q, got %q", i, tt.Literal, tok.Literal)
+		if string(tok.Literal) != tt.Literal {
+			t.Fatalf("tests[%d] - token.literal wrong, expected %+v, got %+v", i, tt.Literal, string(tok.Literal))
 		}
 	}
 }
